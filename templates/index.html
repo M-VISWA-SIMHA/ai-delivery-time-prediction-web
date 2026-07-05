@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dispatch — AI Delivery Time Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="scanline"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">◈</span>
+    <span class="brand-text">DISPATCH<span class="brand-sub">.ai</span></span>
+  </div>
+  <div class="topbar-stats">
+    <div class="stat"><span class="stat-label">MODEL</span><span class="stat-val">{{ meta.name }}</span></div>
+    <div class="stat"><span class="stat-label">R²</span><span class="stat-val">{{ meta.r2 }}</span></div>
+    <div class="stat"><span class="stat-label">MAE</span><span class="stat-val">{{ meta.mae }} min</span></div>
+    <div class="stat"><span class="stat-label">TRAINED ON</span><span class="stat-val">{{ "{:,}".format(meta.training_rows) }} orders</span></div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ===================== LEFT: ROUTE VISUAL ===================== -->
+  <section class="route-panel">
+    <div class="route-panel-inner">
+      <h1 class="headline">Know the ETA<br><span class="headline-accent">before you dispatch.</span></h1>
+      <p class="subhead">A gradient-boosted regression model trained on 45,593 real delivery
+        records estimates arrival time from courier, weather, traffic and distance signals —
+        the same engine that powers the desktop version of this tool, now running as a live service.</p>
+
+      <svg class="route-svg" viewBox="0 0 420 220" fill="none">
+        <path id="routePath" d="M30,180 C 110,60 180,190 260,90 S 380,40 395,35"
+              stroke="#243043" stroke-width="3" stroke-dasharray="2 10" stroke-linecap="round"/>
+        <path id="routeProgress" d="M30,180 C 110,60 180,190 260,90 S 380,40 395,35"
+              stroke="#F5A623" stroke-width="3" stroke-linecap="round"
+              stroke-dasharray="1 1000" />
+        <circle cx="30" cy="180" r="7" fill="#0B1220" stroke="#3AD29F" stroke-width="3"/>
+        <circle id="courierDot" cx="30" cy="180" r="5" fill="#F5A623"/>
+        <circle cx="395" cy="35" r="7" fill="#0B1220" stroke="#F5A623" stroke-width="3"/>
+        <text x="14" y="204" fill="#7C8AA5" font-size="11" font-family="JetBrains Mono">RESTAURANT</text>
+        <text x="330" y="24" fill="#7C8AA5" font-size="11" font-family="JetBrains Mono">DROP-OFF</text>
+      </svg>
+
+      <div class="ticker" id="ticker">
+        <span>AWAITING ORDER DETAILS</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== RIGHT: FORM + RESULT ===================== -->
+  <section class="panel">
+    <form id="predictForm" class="card">
+      <div class="card-head">
+        <h2>Order Manifest</h2>
+        <span class="badge">STEP 1 OF 1</span>
+      </div>
+
+      <div class="grid">
+        <label class="field">
+          <span>Delivery person age</span>
+          <input type="number" name="age" min="15" max="65" value="28" required>
+        </label>
+
+        <label class="field">
+          <span>Delivery person rating</span>
+          <input type="number" name="ratings" step="0.1" min="1" max="5" value="4.7" required>
+        </label>
+
+        <label class="field">
+          <span>Weather conditions</span>
+          <select name="weather" required>
+            {% for c in choices['Weatherconditions'] %}
+            <option value="{{ c }}" {% if c=='Sunny' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Road traffic density</span>
+          <select name="traffic" required>
+            {% for c in choices['Road_traffic_density'] %}
+            <option value="{{ c }}" {% if c=='Medium' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Vehicle condition</span>
+          <select name="vehicle_condition" required>
+            <option value="0">0 — Poor</option>
+            <option value="1">1 — Fair</option>
+            <option value="2" selected>2 — Good</option>
+            <option value="3">3 — Excellent</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Vehicle type</span>
+          <select name="vehicle_type" required>
+            {% for c in choices['Type_of_vehicle'] %}
+            <option value="{{ c }}" {% if c=='motorcycle' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Type of order</span>
+          <select name="order_type" required>
+            {% for c in choices['Type_of_order'] %}
+            <option value="{{ c }}" {% if c=='Meal' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Multiple deliveries</span>
+          <select name="multiple_deliveries" required>
+            <option value="0" selected>0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Festival day?</span>
+          <select name="festival" required>
+            {% for c in choices['Festival'] %}
+            <option value="{{ c }}" {% if c=='No' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field">
+          <span>City type</span>
+          <select name="city" required>
+            {% for c in choices['City'] %}
+            <option value="{{ c }}" {% if c=='Urban' %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="field field-wide">
+          <span>Delivery distance (km)</span>
+          <input type="number" name="distance_km" step="0.1" min="0.1" value="5.2" required>
+        </label>
+      </div>
+
+      <button type="submit" class="run-btn" id="runBtn">
+        <span class="run-btn-label">Run Prediction</span>
+        <span class="run-btn-arrow">→</span>
+      </button>
+    </form>
+
+    <div class="card result-card" id="resultCard" hidden>
+      <div class="card-head">
+        <h2>Prediction</h2>
+        <span class="badge" id="resultTime"></span>
+      </div>
+      <div class="result-main">
+        <div class="result-minutes"><span id="minutesVal">--</span><span class="unit">min</span></div>
+        <div class="result-tag" id="resultTag">—</div>
+      </div>
+      <div class="result-actions">
+        <button type="button" class="ghost-btn" id="downloadBtn">Download report (.csv)</button>
+        <button type="button" class="ghost-btn" id="resetBtn">New prediction</button>
+      </div>
+    </div>
+
+    <div class="card error-card" id="errorCard" hidden>
+      <p id="errorMsg"></p>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>Built with scikit-learn · Flask · deployable to Render, Railway, Fly.io, or any WSGI host</span>
+</footer>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
